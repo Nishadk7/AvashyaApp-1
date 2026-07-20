@@ -9,7 +9,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
-    # Disable caching for seamless local development
+    # Disable caching for seamless development
     def end_headers(self):
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.send_header("Pragma", "no-cache")
@@ -18,10 +18,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(DIRECTORY)
-    with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
+    # Bind host to 0.0.0.0 to accept external requests across AWS Security Groups
+    with socketserver.TCPServer(("0.0.0.0", PORT), Handler) as httpd:
         print(f"============================================================")
         print(f"🚀 Avashya Drop Web Tier (S3 / Nginx Pattern) Running!")
-        print(f"👉 Local Web URL: http://127.0.0.1:{PORT}")
+        print(f"👉 Local Web URL: http://0.0.0.0:{PORT}")
         print(f"👉 Backend API  : http://127.0.0.1:8000")
         print(f"============================================================")
         httpd.serve_forever()

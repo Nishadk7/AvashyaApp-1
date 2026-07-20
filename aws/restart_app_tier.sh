@@ -6,7 +6,7 @@
 # ==============================================================================
 
 # 1. Export AWS RDS IAM Database Auth Environment Variables
-export RDSHOST="avashya-db-instance.cluster-czoekaswcg9j.ap-south-1.rds.amazonaws.com"
+export RDSHOST="avashya-db-instance-instance-1.czoekaswcg9j.ap-south-1.rds.amazonaws.com"
 export DBUSER="nishad"
 export DBNAME="postgres"
 export DBPORT="5432"

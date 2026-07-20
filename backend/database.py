@@ -1,16 +1,15 @@
 import os
-import urllib.parse
 import logging
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 logger = logging.getLogger(__name__)
 
-# Environment variables for RDS IAM Authentication or Standard Connection URL
 RDSHOST = os.getenv("RDSHOST")
 DBUSER = os.getenv("DBUSER", "nishad")
 DBNAME = os.getenv("DBNAME", "postgres")
 DBPORT = int(os.getenv("DBPORT", "5432"))
+DBPASSWORD = os.getenv("DBPASSWORD")
 AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -18,38 +17,60 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 connect_args = {}
 
 if RDSHOST:
-    # -------------------------------------------------------------------------
-    # AWS IAM Database Authentication Pattern
-    # Generates dynamic IAM auth tokens using boto3
-    # -------------------------------------------------------------------------
-    try:
-        import boto3
-        rds_client = boto3.client("rds", region_name=AWS_REGION)
-        raw_token = rds_client.generate_db_auth_token(
-            DBHostname=RDSHOST,
-            Port=DBPORT,
-            DBUsername=DBUSER,
-            Region=AWS_REGION
-        )
-        encoded_token = urllib.parse.quote_plus(raw_token)
-        DATABASE_URL = f"postgresql+psycopg2://{DBUSER}:{encoded_token}@{RDSHOST}:{DBPORT}/{DBNAME}?sslmode=require"
-        logger.info(f"Connected to RDS PostgreSQL using AWS IAM DB Auth (Host: {RDSHOST}, User: {DBUSER})")
-    except Exception as e:
-        logger.error(f"Failed to generate IAM DB Auth token: {e}")
-        if not DATABASE_URL:
-            DATABASE_URL = "sqlite:///./app.db"
+    import psycopg2
+    import boto3
 
-elif not DATABASE_URL:
+    def get_rds_connection():
+        if DBPASSWORD:
+            logger.info(f"Connecting to RDS PostgreSQL using Password Auth (Host: {RDSHOST}, User: {DBUSER})")
+            return psycopg2.connect(
+                host=RDSHOST,
+                port=DBPORT,
+                database=DBNAME,
+                user=DBUSER,
+                password=DBPASSWORD,
+                sslmode='require'
+            )
+        else:
+            logger.info(f"Connecting to RDS PostgreSQL using IAM DB Auth (Host: {RDSHOST}, User: {DBUSER}, Region: {AWS_REGION})")
+            rds_client = boto3.client('rds', region_name=AWS_REGION)
+            auth_token = rds_client.generate_db_auth_token(
+                DBHostname=RDSHOST,
+                Port=DBPORT,
+                DBUsername=DBUSER,
+                Region=AWS_REGION
+            )
+            return psycopg2.connect(
+                host=RDSHOST,
+                port=DBPORT,
+                database=DBNAME,
+                user=DBUSER,
+                password=auth_token,
+                sslmode='require'
+            )
+
+    engine = create_engine(
+        'postgresql+psycopg2://',
+        creator=get_rds_connection,
+        pool_pre_ping=True
+    )
+
+elif DATABASE_URL:
+    if DATABASE_URL.startswith("sqlite"):
+        connect_args["check_same_thread"] = False
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args=connect_args,
+        pool_pre_ping=True
+    )
+else:
     DATABASE_URL = "sqlite:///./app.db"
-
-if DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args=connect_args,
-    pool_pre_ping=True
-)
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args=connect_args,
+        pool_pre_ping=True
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

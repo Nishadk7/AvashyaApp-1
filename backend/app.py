@@ -22,7 +22,7 @@ from passlib.context import CryptContext
 
 from database import Base, engine, get_db
 from models import User, Item, ItemTag, ALLOWED_TYPES
-from storage import get_storage_service, BaseStorageService
+from storage import get_storage_service, S3StorageService
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
@@ -184,7 +184,7 @@ def list_items(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    storage: BaseStorageService = Depends(get_storage_service)
+    storage: S3StorageService = Depends(get_storage_service)
 ):
     query = db.query(Item)
 
@@ -242,7 +242,7 @@ async def upload_item(
     request: Request,
     user: User = Depends(require_current_user),
     db: Session = Depends(get_db),
-    storage: BaseStorageService = Depends(get_storage_service)
+    storage: S3StorageService = Depends(get_storage_service)
 ):
     form = await request.form()
     item_name = str(form.get("item_name", "")).strip()
@@ -302,7 +302,7 @@ def delete_item(
     item_id: int,
     user: User = Depends(require_current_user),
     db: Session = Depends(get_db),
-    storage: BaseStorageService = Depends(get_storage_service)
+    storage: S3StorageService = Depends(get_storage_service)
 ):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:

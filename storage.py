@@ -45,11 +45,11 @@ class LocalStorageService(BaseStorageService):
         return False
 
     def get_file_url(self, file_reference: str) -> str:
-        return f"/files/{file_reference}"
+        return f"/api/files/{file_reference}"
 
 
 class S3StorageService(BaseStorageService):
-    def __init__(self, bucket_name: str, region_name: str = "us-east-1"):
+    def __init__(self, bucket_name: str, region_name: str = "ap-south-1"):
         import boto3
         self.bucket_name = bucket_name
         self.region_name = region_name
@@ -77,6 +77,8 @@ class S3StorageService(BaseStorageService):
             return False
 
     def get_file_url(self, file_reference: str, expiration: int = 3600) -> str:
+        if not file_reference.startswith("uploads/"):
+            return f"/api/files/{file_reference}"
         try:
             url = self.s3_client.generate_presigned_url(
                 "get_object",
@@ -91,7 +93,7 @@ class S3StorageService(BaseStorageService):
 def get_storage_service() -> BaseStorageService:
     provider = os.getenv("STORAGE_PROVIDER", "").lower()
     bucket_name = os.getenv("S3_BUCKET_NAME", "")
-    region_name = os.getenv("AWS_REGION", "us-east-1")
+    region_name = os.getenv("AWS_REGION", "ap-south-1")
 
     if provider == "s3" or bucket_name:
         if not bucket_name:

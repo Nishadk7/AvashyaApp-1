@@ -48,7 +48,7 @@ class LocalStorageService(BaseStorageService):
         return False
 
     def get_file_url(self, file_reference: str) -> str:
-        return f"http://127.0.0.1:8000/api/files/{file_reference}"
+        return f"/api/files/{file_reference}"
 
 
 class S3StorageService(BaseStorageService):
@@ -56,7 +56,7 @@ class S3StorageService(BaseStorageService):
     Amazon S3 Object Storage Service Implementation.
     Uses boto3 to upload objects to S3 and generate Zero-Trust S3 Pre-Signed URLs.
     """
-    def __init__(self, bucket_name: str, region_name: str = "us-east-1"):
+    def __init__(self, bucket_name: str, region_name: str = "ap-south-1"):
         import boto3
         self.bucket_name = bucket_name
         self.region_name = region_name
@@ -89,6 +89,10 @@ class S3StorageService(BaseStorageService):
         """
         Generates a secure, short-lived Amazon S3 Pre-Signed URL (Zero-Trust pattern).
         """
+        # If file reference is a local file reference without uploads/ prefix (legacy item):
+        if not file_reference.startswith("uploads/"):
+            return f"/api/files/{file_reference}"
+
         try:
             url = self.s3_client.generate_presigned_url(
                 "get_object",
@@ -98,16 +102,14 @@ class S3StorageService(BaseStorageService):
             return url
         except Exception as e:
             logger.error(f"Failed to generate S3 Pre-Signed URL for {file_reference}: {e}")
-            # Fallback URL format
             return f"https://{self.bucket_name}.s3.{self.region_name}.amazonaws.com/{file_reference}"
 
 
 def get_storage_service() -> BaseStorageService:
     provider = os.getenv("STORAGE_PROVIDER", "").lower()
     bucket_name = os.getenv("S3_BUCKET_NAME", "")
-    region_name = os.getenv("AWS_REGION", "us-east-1")
+    region_name = os.getenv("AWS_REGION", "ap-south-1")
 
-    # If S3 is requested via STORAGE_PROVIDER=s3 or S3_BUCKET_NAME is set:
     if provider == "s3" or bucket_name:
         if not bucket_name:
             logger.warning("STORAGE_PROVIDER set to 's3' but S3_BUCKET_NAME environment variable is missing. Falling back to local storage.")

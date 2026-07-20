@@ -1,67 +1,20 @@
 import os
 import uuid
 import logging
-from abc import ABC, abstractmethod
+import boto3
 
 logger = logging.getLogger(__name__)
 
-class BaseStorageService(ABC):
-    @abstractmethod
-    def save_file(self, file_content: bytes, original_filename: str) -> str:
-        """Saves file and returns unique file reference key."""
-        pass
-
-    @abstractmethod
-    def delete_file(self, file_reference: str) -> bool:
-        """Deletes file corresponding to file_reference."""
-        pass
-
-    @abstractmethod
-    def get_file_url(self, file_reference: str) -> str:
-        """Returns accessible URL or S3 Pre-Signed URL for file download."""
-        pass
-
-
-class LocalStorageService(BaseStorageService):
-    def __init__(self, upload_dir: str = "./backend/uploads"):
-        self.upload_dir = upload_dir
-        os.makedirs(self.upload_dir, exist_ok=True)
-
-    def save_file(self, file_content: bytes, original_filename: str) -> str:
-        ext = os.path.splitext(original_filename)[1]
-        unique_filename = f"{uuid.uuid4().hex}{ext}"
-        file_path = os.path.join(self.upload_dir, unique_filename)
-
-        with open(file_path, "wb") as f:
-            f.write(file_content)
-
-        return unique_filename
-
-    def delete_file(self, file_reference: str) -> bool:
-        file_path = os.path.join(self.upload_dir, file_reference)
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-                return True
-            except OSError:
-                return False
-        return False
-
-    def get_file_url(self, file_reference: str) -> str:
-        return f"/api/files/{file_reference}"
-
-
-class S3StorageService(BaseStorageService):
+class S3StorageService:
     """
-    Amazon S3 Object Storage Service Implementation.
-    Uses boto3 to upload objects to S3 and generate Zero-Trust S3 Pre-Signed URLs.
+    Production Amazon S3 Storage Service.
+    Uploads objects directly to Amazon S3 and generates Zero-Trust S3 Pre-Signed URLs.
     """
-    def __init__(self, bucket_name: str, region_name: str = "ap-south-1"):
-        import boto3
-        self.bucket_name = bucket_name
-        self.region_name = region_name
-        self.s3_client = boto3.client("s3", region_name=region_name)
-        logger.info(f"Initialized Amazon S3 Storage Service (Bucket: {bucket_name}, Region: {region_name})")
+    def __init__(self, bucket_name: str = None, region_name: str = None):
+        self.bucket_name = bucket_name or os.getenv("S3_BUCKET_NAME", "avashya-drop-uploads-2026")
+        self.region_name = region_name or os.getenv("AWS_REGION", "ap-south-1")
+        self.s3_client = boto3.client("s3", region_name=self.region_name)
+        logger.info(f"Initialized Pure Amazon S3 Storage Service (Bucket: {self.bucket_name}, Region: {self.region_name})")
 
     def save_file(self, file_content: bytes, original_filename: str) -> str:
         ext = os.path.splitext(original_filename)[1]
@@ -89,10 +42,6 @@ class S3StorageService(BaseStorageService):
         """
         Generates a secure, short-lived Amazon S3 Pre-Signed URL (Zero-Trust pattern).
         """
-        # If file reference is a local file reference without uploads/ prefix (legacy item):
-        if not file_reference.startswith("uploads/"):
-            return f"/api/files/{file_reference}"
-
         try:
             url = self.s3_client.generate_presigned_url(
                 "get_object",
@@ -105,19 +54,7 @@ class S3StorageService(BaseStorageService):
             return f"https://{self.bucket_name}.s3.{self.region_name}.amazonaws.com/{file_reference}"
 
 
-def get_storage_service() -> BaseStorageService:
-    provider = os.getenv("STORAGE_PROVIDER", "").lower()
-    bucket_name = os.getenv("S3_BUCKET_NAME", "")
+def get_storage_service() -> S3StorageService:
+    bucket_name = os.getenv("S3_BUCKET_NAME", "avashya-drop-uploads-2026")
     region_name = os.getenv("AWS_REGION", "ap-south-1")
-
-    if provider == "s3" or bucket_name:
-        if not bucket_name:
-            logger.warning("STORAGE_PROVIDER set to 's3' but S3_BUCKET_NAME environment variable is missing. Falling back to local storage.")
-            return LocalStorageService()
-        try:
-            return S3StorageService(bucket_name=bucket_name, region_name=region_name)
-        except Exception as e:
-            logger.error(f"Could not initialize S3 Storage Service: {e}. Falling back to LocalStorageService.")
-            return LocalStorageService()
-
-    return LocalStorageService()
+    return S3StorageService(bucket_name=bucket_name, region_name=region_name)

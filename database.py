@@ -1,10 +1,40 @@
 import os
+import urllib.parse
+import logging
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+logger = logging.getLogger(__name__)
+
+RDSHOST = os.getenv("RDSHOST")
+DBUSER = os.getenv("DBUSER", "nishad")
+DBNAME = os.getenv("DBNAME", "postgres")
+DBPORT = int(os.getenv("DBPORT", "5432"))
+AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 connect_args = {}
+
+if RDSHOST:
+    try:
+        import boto3
+        rds_client = boto3.client("rds", region_name=AWS_REGION)
+        raw_token = rds_client.generate_db_auth_token(
+            DBHostname=RDSHOST,
+            Port=DBPORT,
+            DBUsername=DBUSER,
+            Region=AWS_REGION
+        )
+        encoded_token = urllib.parse.quote_plus(raw_token)
+        DATABASE_URL = f"postgresql+psycopg2://{DBUSER}:{encoded_token}@{RDSHOST}:{DBPORT}/{DBNAME}?sslmode=require"
+    except Exception as e:
+        if not DATABASE_URL:
+            DATABASE_URL = "sqlite:///./app.db"
+
+elif not DATABASE_URL:
+    DATABASE_URL = "sqlite:///./app.db"
+
 if DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 

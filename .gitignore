@@ -1,0 +1,25 @@
+# Python Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Database & Uploads
+*.db
+app.db
+backend/app.db
+uploads/*
+!uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Python Cache & Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/

@@ -3,8 +3,8 @@ import sys
 import datetime
 from typing import List, Optional
 
-# Add backend directory to sys.path for clean imports
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add backend directory to sys.path at position 0 for explicit imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, Depends, HTTPException, status, Form, UploadFile, File, Request, Query
 from fastapi.responses import FileResponse, JSONResponse
@@ -14,9 +14,9 @@ from sqlalchemy.orm import Session
 import jwt
 from passlib.context import CryptContext
 
-from database import Base, engine, get_db
-from models import User, Item, ItemTag, ALLOWED_TYPES
-from storage import get_storage_service, BaseStorageService
+from backend.database import Base, engine, get_db
+from backend.models import User, Item, ItemTag, ALLOWED_TYPES
+from backend.storage import get_storage_service, BaseStorageService
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine)

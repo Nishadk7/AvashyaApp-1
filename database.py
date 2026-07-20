@@ -1,7 +1,8 @@
 import os
 import sys
 
-# Redirect root imports directly to backend/database.py
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend"))
+BACKEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend")
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
 
-from backend.database import Base, engine, get_db, SessionLocal
+from database import Base, engine, get_db, SessionLocal

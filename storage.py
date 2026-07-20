@@ -1,7 +1,8 @@
 import os
 import sys
 
-# Redirect root imports directly to backend/storage.py
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend"))
+BACKEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend")
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
 
-from backend.storage import get_storage_service, S3StorageService
+from storage import get_storage_service, S3StorageService

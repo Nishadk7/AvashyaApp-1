@@ -3,8 +3,14 @@ import sys
 import datetime
 from typing import List, Optional
 
-# Add backend directory to sys.path at position 0 for explicit imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add root directory and backend directory to sys.path for robust imports
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BACKEND_DIR)
+
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
 from fastapi import FastAPI, Depends, HTTPException, status, Form, UploadFile, File, Request, Query
 from fastapi.responses import FileResponse, JSONResponse
@@ -14,9 +20,9 @@ from sqlalchemy.orm import Session
 import jwt
 from passlib.context import CryptContext
 
-from backend.database import Base, engine, get_db
-from backend.models import User, Item, ItemTag, ALLOWED_TYPES
-from backend.storage import get_storage_service, BaseStorageService
+from database import Base, engine, get_db
+from models import User, Item, ItemTag, ALLOWED_TYPES
+from storage import get_storage_service, BaseStorageService
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
@@ -74,7 +80,6 @@ seed_default_users()
 # Initialize FastAPI REST API App
 app = FastAPI(title="Avashya Drop REST API (Port 8000)")
 
-# Enable CORS for Web Tier (Port 5000 / Nginx / S3 Static Web)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -86,81 +91,65 @@ app.add_middleware(
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
     auth_header = request.headers.get("Authorization")
-    token = None
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    else:
-        token = request.cookies.get("access_token")
-        if token and token.startswith("Bearer "):
-            token = token[7:]
-
-    if not token:
+    if not auth_header or not auth_header.startswith("Bearer "):
         return None
 
+    token = auth_header.split(" ")[1]
     payload = decode_access_token(token)
     if not payload:
         return None
+
     username = payload.get("sub")
     if not username:
         return None
 
-    return db.query(User).filter(User.username == username).first()
-
-
-def require_current_user(user: Optional[User] = Depends(get_current_user)) -> User:
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    user = db.query(User).filter(User.username == username).first()
     return user
 
 
-# API Endpoints
-
-@app.get("/api/files/{filename}")
-def serve_file(filename: str):
-    file_path = os.path.join("./backend/uploads", filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(file_path)
+def require_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+    user = get_current_user(request, db)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication credentials were not provided or are invalid",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
 
 
 @app.post("/api/auth/register")
-async def register(request: Request, db: Session = Depends(get_db)):
-    data = {}
-    if request.headers.get("content-type", "").startswith("application/json"):
-        data = await request.json()
-    else:
-        form = await request.form()
-        data = {k: str(v) for k, v in form.items()}
-
+def register(data: dict, db: Session = Depends(get_db)):
     username = data.get("username", "").strip()
     email = data.get("email", "").strip()
     password = data.get("password", "").strip()
 
     if not username or not email or not password:
-        raise HTTPException(status_code=400, detail="Username, email, and password required")
+        raise HTTPException(status_code=400, detail="Username, email, and password are required")
 
-    existing_user = db.query(User).filter(or_(User.username == username, User.email == email)).first()
+    existing_user = db.query(User).filter((User.username == username) | (User.email == email)).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username or email already registered")
 
-    new_user = User(username=username, email=email, hashed_password=hash_password(password))
-    db.add(new_user)
+    user = User(
+        username=username,
+        email=email,
+        hashed_password=hash_password(password)
+    )
+    db.add(user)
     db.commit()
-    db.refresh(new_user)
+    db.refresh(user)
 
-    token = create_access_token({"sub": new_user.username})
-    return {"token": token, "user": {"id": new_user.id, "username": new_user.username, "email": new_user.email}}
+    token = create_access_token({"sub": user.username})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {"id": user.id, "username": user.username, "email": user.email}
+    }
 
 
 @app.post("/api/auth/login")
-async def login(request: Request, db: Session = Depends(get_db)):
-    data = {}
-    if request.headers.get("content-type", "").startswith("application/json"):
-        data = await request.json()
-    else:
-        form = await request.form()
-        data = {k: str(v) for k, v in form.items()}
-
+def login(data: dict, db: Session = Depends(get_db)):
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
 
@@ -169,7 +158,11 @@ async def login(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     token = create_access_token({"sub": user.username})
-    return {"token": token, "user": {"id": user.id, "username": user.username, "email": user.email}}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {"id": user.id, "username": user.username, "email": user.email}
+    }
 
 
 @app.get("/api/auth/me")
@@ -256,11 +249,11 @@ async def upload_item(
     type = str(form.get("type", "")).strip()
     file_obj = form.get("file")
 
-    if not item_name or not type or not file_obj or not hasattr(file_obj, "filename"):
-        raise HTTPException(status_code=400, detail="Missing required item_name, type, or file")
+    if not item_name or not type or not file_obj:
+        raise HTTPException(status_code=400, detail="Item Name, Type, and File are required")
 
     if type not in ALLOWED_TYPES:
-        raise HTTPException(status_code=400, detail=f"Invalid file type. Allowed: {','.join(ALLOWED_TYPES)}")
+        raise HTTPException(status_code=400, detail=f"Invalid type. Must be one of: {ALLOWED_TYPES}")
 
     file_bytes = await file_obj.read()
     if not file_bytes:
@@ -283,19 +276,24 @@ async def upload_item(
     tag_values = form.getlist("tag_values[]") + form.getlist("tag_values")
 
     for key, val in zip(tag_keys, tag_values):
-        k_clean = str(key).strip()
-        v_clean = str(val).strip()
-        if k_clean and v_clean:
-            tag = ItemTag(item_id=new_item.id, key=k_clean, value=v_clean)
+        k = str(key).strip()
+        v = str(val).strip()
+        if k and v:
+            tag = ItemTag(item_id=new_item.id, key=k, value=v)
             db.add(tag)
 
     db.commit()
+    db.refresh(new_item)
 
     return {
         "id": new_item.id,
         "item_name": new_item.item_name,
         "type": new_item.type,
-        "file_url": storage.get_file_url(file_ref)
+        "upload_date": new_item.upload_date.isoformat(),
+        "file_reference": new_item.file_reference,
+        "file_url": storage.get_file_url(new_item.file_reference),
+        "owner": {"username": user.username},
+        "tags": [{"key": t.key, "value": t.value} for t in new_item.tags]
     }
 
 

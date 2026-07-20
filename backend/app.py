@@ -3,14 +3,10 @@ import sys
 import datetime
 from typing import List, Optional
 
-# Add root directory and backend directory to sys.path for robust imports
+# Add backend directory to sys.path at position 0 for clean local imports
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BACKEND_DIR)
-
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
 
 from fastapi import FastAPI, Depends, HTTPException, status, Form, UploadFile, File, Request, Query
 from fastapi.responses import FileResponse, JSONResponse

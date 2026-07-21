@@ -161,7 +161,7 @@
                     if (!res.ok) {
                         throw new Error(data.detail || 'Registration failed');
                     }
-                    localStorage.setItem('access_token', data.token);
+                    localStorage.setItem('access_token', data.access_token || data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
                     window.location.href = '/index.html?msg=Account+created+successfully';
                 } catch (err) {

@@ -10,6 +10,7 @@ export RDSHOST="${RDSHOST:-${RDS_ENDPOINT}}"
 export DBUSER="${DBUSER:-postgres}"
 export DBNAME="${DBNAME:-avashyadadb}"
 export DBPORT="${DBPORT:-5432}"
+export DBPASSWORD="${DBPASSWORD:-AvashyaPass2026!}"
 export AWS_REGION="${AWS_REGION:-ap-south-1}"
 
 # 2. Export Amazon S3 Environment Variables

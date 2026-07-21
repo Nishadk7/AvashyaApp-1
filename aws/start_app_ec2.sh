@@ -6,15 +6,15 @@
 # ==============================================================================
 
 # 1. Export AWS RDS IAM Database Auth Environment Variables
-export RDSHOST="avashya-db-instance-instance-1.czoekaswcg9j.ap-south-1.rds.amazonaws.com"
-export DBUSER="nishad"
-export DBNAME="postgres"
-export DBPORT="5432"
-export AWS_REGION="ap-south-1"
+export RDSHOST="${RDSHOST:-${RDS_ENDPOINT}}"
+export DBUSER="${DBUSER:-postgres}"
+export DBNAME="${DBNAME:-avashyadadb}"
+export DBPORT="${DBPORT:-5432}"
+export AWS_REGION="${AWS_REGION:-ap-south-1}"
 
 # 2. Export Amazon S3 Environment Variables
 export STORAGE_PROVIDER="s3"
-export S3_BUCKET_NAME="avashya-drop-uploads-2026"
+export S3_BUCKET_NAME="${S3_BUCKET_NAME:-avashya-drop-uploads-2026}"
 
 # 3. Kill any process listening on Port 8000 or running backend/app.py
 fuser -k 8000/tcp 2>/dev/null || true

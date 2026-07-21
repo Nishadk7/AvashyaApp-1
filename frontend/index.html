@@ -306,12 +306,16 @@
                 const res = await fetch(`${API_BASE}/auth/me`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (!res.ok) throw new Error();
+                if (!res.ok) {
+                    console.error('[Avashya Auth] /auth/me status:', res.status);
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
                 currentUser = await res.json();
                 renderNavUser();
             } catch (err) {
+                console.error('[Avashya Auth] Authentication failed:', err);
                 localStorage.removeItem('access_token');
-                window.location.href = '/login.html';
+                window.location.href = '/login.html?error=session_expired';
                 return;
             }
 

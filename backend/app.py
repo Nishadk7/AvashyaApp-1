@@ -85,6 +85,12 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+@app.get("/api/health")
+def health_check():
+    return {"status": "healthy", "service": "Avashya Drop REST API"}
+
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):

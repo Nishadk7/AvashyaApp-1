@@ -18,7 +18,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(DIRECTORY)
-    # Bind host to 0.0.0.0 to accept external requests across AWS Security Groups
+    # Enable address reuse to avoid Errno 98 Address already in use
+    socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("0.0.0.0", PORT), Handler) as httpd:
         print(f"============================================================")
         print(f"🚀 Avashya Drop Web Tier (S3 / Nginx Pattern) Running!")

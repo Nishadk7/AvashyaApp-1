@@ -3,6 +3,10 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
 
+def get_ist_now():
+    """Returns current naive datetime in IST (UTC+5:30)."""
+    return datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+
 class User(Base):
     __tablename__ = "users"
     __table_args__ = {'extend_existing': True}
@@ -11,7 +15,7 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=get_ist_now)
 
     items = relationship("Item", back_populates="owner", cascade="all, delete-orphan")
 
@@ -25,7 +29,7 @@ class Item(Base):
     id = Column(Integer, primary_key=True, index=True)
     item_name = Column(String, nullable=False, index=True)
     type = Column(String, nullable=False, index=True)
-    upload_date = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    upload_date = Column(DateTime, default=get_ist_now, index=True)
     file_reference = Column(String, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
